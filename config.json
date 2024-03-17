@@ -1,0 +1,29 @@
+
+{
+    "api_key": "AIzaSyD2TnUibGxwgFekqlDDkb-6C0yxtKXaSWo",
+    
+    "channel_ids": ["UCQYZICqVoX2KKGxVOHZnfbg",
+    "UCFtOOGNZqDl6nPhvmurz5Og",
+    "UC1hfwnEkWxb9tkwgBjGGgXA",
+    "UCuaj1eVLt9O2aHRN-ULEXiQ",
+    "UCOn8LdKK82EgLIpL4ZBzXMg",
+    "UCAx5cp9oyU57CGxSZ4HWk_g",
+    "UCKrK_2vjELGn5vQNWUmcbRQ",
+    "UChacpQ2UA6HJQXvYnKtwkOg"],
+
+    "mongo": {
+      "connection_string": "mongodb://localhost:27017/",
+      "db_name": "youtube_data",
+      "channel_collection": "channels",
+      "video_collection": "videos",
+      "comment_collection": "comments"
+    },
+
+    "mysql": {
+      "host": "localhost",
+      "user": "root",
+      "password": "root",
+      "database": "youtube_data"
+    }
+  
+  }
