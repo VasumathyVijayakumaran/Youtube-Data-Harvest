@@ -1,4 +1,5 @@
 import json
+import time
 from pymongo import MongoClient
 import requests
 from googleapiclient.discovery import build
@@ -42,7 +43,7 @@ def get_channel_info(api_key, channel_id):
     ).execute()
     
     channel_data = response['items'][0]
-    channel_info = {
+    channel_infor = {
         '_id': channel_data['id'],
         'channelId': channel_data['id'],
         'videoCount': int(channel_data['statistics']['videoCount']),
@@ -53,7 +54,7 @@ def get_channel_info(api_key, channel_id):
         'channelType': channel_data['kind']
     }
     
-    return channel_info
+    return channel_infor
 
 def get_video_ids(api_key, channel_id):
     video_url = 'https://www.googleapis.com/youtube/v3/search'
@@ -81,41 +82,55 @@ def get_video_ids(api_key, channel_id):
                 video_params['pageToken'] = data['nextPageToken']
             else:
                 break
-
+            break
         except KeyError as e:
             print(f"KeyError: {e}")
             print("Check the structure of the API response.")
-            return []
+            return[]
     return all_video_ids
 
 
 def get_videoinfo_from_video(api_key, video_id):
-    youtube = build('youtube', 'v3', developerKey=api_key)
-               
-    response = youtube.videos().list(
-    part="snippet,contentDetails,statistics",
-    id=video_id).execute()
-    video_data=response['items'][0]
-     
-    video_info = {
-                '_id': video_id,
-                'channelId': video_data['snippet']['channelId'],
-                'videoId': video_id,
-                'videoName': video_data['snippet']['title'],
-                'videoDescription': video_data['snippet']['description'],
-                'thumbnailUrl': video_data['snippet']['thumbnails']['default']['url'],
-                'publishedAt': video_data['snippet']['publishedAt'],
-                "viewCount": int(video_data["statistics"].get("viewCount", 0)),
-                "likeCount": int(video_data["statistics"].get("likeCount", 0)),
-                "dislikeCount": int(video_data["statistics"].get("dislikeCount", 0)),
-                "favoriteCount": int(video_data["statistics"].get("favoriteCount", 0)),
-                "commentCount": int(video_data["statistics"].get("commentCount", 0)),
-                "captionStatus": video_data["contentDetails"]["caption"],
-                "duration":video_data["contentDetails"]["duration"]
-            }
-           
-        
-    return video_info
+    max_retries=3
+    retry_count=0
+    while retry_count<max_retries:
+        try:
+            youtube = build('youtube', 'v3', developerKey=api_key)
+                    
+            response = youtube.videos().list(
+            part="snippet,contentDetails,statistics",
+            id=video_id).execute()
+            video_data=response['items'][0]
+            
+            video_info = {
+                        '_id': video_id,
+                        'channelId': video_data['snippet']['channelId'],
+                        'videoId': video_id,
+                        'videoName': video_data['snippet']['title'],
+                        'videoDescription': video_data['snippet']['description'],
+                        'thumbnailUrl': video_data['snippet']['thumbnails']['default']['url'],
+                        'publishedAt': video_data['snippet']['publishedAt'],
+                        "viewCount": int(video_data["statistics"].get("viewCount", 0)),
+                        "likeCount": int(video_data["statistics"].get("likeCount", 0)),
+                        "dislikeCount": int(video_data["statistics"].get("dislikeCount", 0)),
+                        "favoriteCount": int(video_data["statistics"].get("favoriteCount", 0)),
+                        "commentCount": int(video_data["statistics"].get("commentCount", 0)),
+                        "captionStatus": video_data["contentDetails"]["caption"],
+                        "duration":video_data["contentDetails"]["duration"]
+                    }
+            break
+        except HttpError as e:
+            if e.resp.status == 503:
+                print(f"YouTube API service is currently unavailable. Retrying in 10 seconds...")
+                retry_count+=1
+                if retry_count < max_retries:
+                    print(f"Retrying in 10 seconds... (Retry attempt {retry_count} of {max_retries})")
+                    time.sleep(10)
+            else:
+                print(f"HTTP error occurred: {e}")
+                raise e   
+                   
+    return(video_info)
 
 def get_video_comments(api_key, video_id):
     try:
@@ -148,22 +163,18 @@ def get_video_comments(api_key, video_id):
         else:
             raise e
 
-
-def main():
-    # Load configuration from config file
-    print("Read Config File...")
-    config = load_config('config.json')
-
-    # Fetch and store channel information
-    for channel_id in config['channel_ids']:
+def load_Youtube(channel_id):
         print("Get Channel Info..."  + channel_id)
+        
+        config = load_config('config.json')
+        
         channel_info = get_channel_info(config['api_key'], channel_id)
         print("Save Channel Info..." )
         save_channel_info_to_mongodb(config, channel_info)
 
         # Fetch and store video information
         video_ids = get_video_ids(config['api_key'], channel_id)
-        
+        print(video_ids)
         for video in video_ids:
             video_inform = get_videoinfo_from_video(config['api_key'], video)
             
@@ -171,7 +182,12 @@ def main():
 
             # Fetch and store comments for each video            
             comments = get_video_comments(config['api_key'], video)
-            save_comments_to_mongodb(config, comments)
+            save_comments_to_mongodb(config, comments)  
 
+
+def main():
+    # Load configuration from config file
+    print("Read Config File...")
+      #  print("Save Channel Info..." )
 if __name__ == "__main__":
     main()
