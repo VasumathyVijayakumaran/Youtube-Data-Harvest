@@ -1,15 +1,41 @@
 import streamlit as st
+from mongo_operations import get_channel_info,load_Youtube
+from mysql_operations import connect_to_mysql,migrate_data_to_mysql
+import json
 import pandas as pd
-import mysql.connector
+from pymongo import MongoClient
+
+with open('config.json', 'r') as f:
+    config= json.load(f)
+    
 st.title("Youtube Data Harvesting")
-conn= mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="root",
-    database="youtube_data"
-)
 
+conn= connect_to_mysql(config)
+cursor = conn.cursor()    
+client=MongoClient(config['mongo']['connection_string'])
+db=client['youtube_data']
+# Display channel information from MongoDB
 
+col1, col2 = st.columns(2)
+
+with col1:
+    option=[]
+    channel_id=st.text_input("Enter the Channel_id")
+#button=st.button("Show channel data")
+    if channel_id:
+        channinfo=get_channel_info(config['api_key'],channel_id)
+        option_text=channinfo['title']
+        load_Youtube(channel_id)
+     
+        with col2:
+            option.append(option_text)
+           # options = [option.strip() for option in channel_id.split(",")]
+            selected_option = st.selectbox("Migrate the channel data from MongoDB to MYSQL",options=option)
+            if st.button("Click me"):
+                st.write(f"you selected: {selected_option}")                
+                migrate_data_to_mysql(config, db, conn,channel_id)
+                st.write("Data Successfully Migrated to MYSQL")               
+                
 # Function to execute MySQL query and display result as table
 def display_query_result_as_table(mysql_conn, query, table_title):
     # Number of records per page
@@ -23,8 +49,7 @@ def display_query_result_as_table(mysql_conn, query, table_title):
         df = pd.DataFrame(result, columns=[desc[0] for desc in cursor.description])
         st.write(f"### {table_title}")
         st.dataframe(df)
-
-        
+                
     else:
         st.write(f"No data found for {table_title}")
 
